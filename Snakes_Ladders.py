@@ -6,10 +6,7 @@ import random
 import math
 import statistics
 
-# Semente Aleatória
 random.seed(2112)
-
-# Parâmetros da Simulação
 SIMULATION_COUNT = 10000
 
 # Constantes do Tabuleiro
