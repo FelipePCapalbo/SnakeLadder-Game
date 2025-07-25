@@ -6,7 +6,6 @@ import random
 import math
 import statistics
 
-random.seed(2112)
 SIMULATION_COUNT = 10000
 
 # Constantes do Tabuleiro
@@ -53,26 +52,31 @@ def analyze_p1_win_probability():
     print(f"> O jogador que começa tem aproximadamente {win_prob*100:.2f}% de chance de vencer.")
     print(f"  (Com 95% de confiança, esta chance está entre {ci_lower:.2f}% e {ci_upper:.2f}%)")
 
-def simulate_solo_game_and_count_snakes():
-    current_pos = START_SQUARE
-    snake_landings = 0
-    while current_pos < WIN_SQUARE:
-        dice_roll = random.randint(1, 6)
-        next_pos = current_pos + dice_roll
-        
-        is_snake = next_pos in SPECIAL_MOVES and SPECIAL_MOVES[next_pos] < next_pos
-        if is_snake:
-            snake_landings += 1
-        
-        if next_pos in SPECIAL_MOVES:
-            current_pos = SPECIAL_MOVES[next_pos]
-        else:
-            current_pos = next_pos
-    return snake_landings
+def simulate_two_player_game_and_count_snakes():
+    p1_pos = START_SQUARE
+    p2_pos = START_SQUARE
+    total_snake_landings = 0
+    
+    while True:
+        # Turno P1
+        dice_roll_p1 = random.randint(1, 6)
+        next_pos_p1 = p1_pos + dice_roll_p1
+        if next_pos_p1 in SPECIAL_MOVES and SPECIAL_MOVES[next_pos_p1] < next_pos_p1:
+            total_snake_landings += 1
+        p1_pos = play_turn(p1_pos)
+        if p1_pos >= WIN_SQUARE: return total_snake_landings
+
+        # Turno P2
+        dice_roll_p2 = random.randint(1, 6)
+        next_pos_p2 = p2_pos + dice_roll_p2
+        if next_pos_p2 in SPECIAL_MOVES and SPECIAL_MOVES[next_pos_p2] < next_pos_p2:
+            total_snake_landings += 1
+        p2_pos = play_turn(p2_pos)
+        if p2_pos >= WIN_SQUARE: return total_snake_landings
 
 def analyze_snake_landings():
     print("Pergunta 2: Em média, em quantas cobras os jogadores caem a cada jogo?")
-    snake_landings_list = [simulate_solo_game_and_count_snakes() for _ in range(SIMULATION_COUNT)]
+    snake_landings_list = [simulate_two_player_game_and_count_snakes() for _ in range(SIMULATION_COUNT)]
     
     avg_landings = statistics.mean(snake_landings_list)
     std_dev = statistics.stdev(snake_landings_list)
@@ -80,30 +84,40 @@ def analyze_snake_landings():
     ci_lower = avg_landings - error_margin
     ci_upper = avg_landings + error_margin
 
-    print(f"> Em um jogo comum, um jogador cai em cobras, em média, {avg_landings:.2f} vezes.")
+    print(f"> Em um jogo comum, o total de quedas em cobras é, em média, {avg_landings:.2f} vezes.")
     print(f"  (Com 95% de confiança, a média real está entre {ci_lower:.2f} e {ci_upper:.2f} quedas).")
 
 def simulate_game_with_random_ladders():
-    current_pos = START_SQUARE
+    p1_pos = START_SQUARE
+    p2_pos = START_SQUARE
     turn_count = 0
-    while current_pos < WIN_SQUARE:
+    
+    while True:
+        # Turno P1
         turn_count += 1
-        dice_roll = random.randint(1, 6)
-        next_pos = current_pos + dice_roll
-        
-        is_ladder = next_pos in SPECIAL_MOVES and SPECIAL_MOVES[next_pos] > next_pos
-        
-        if is_ladder:
-            if random.random() < 0.5:
-                current_pos = SPECIAL_MOVES[next_pos]
-            else:
-                current_pos = next_pos
+        dice_roll_p1 = random.randint(1, 6)
+        next_pos_p1 = p1_pos + dice_roll_p1
+        is_ladder_p1 = next_pos_p1 in SPECIAL_MOVES and SPECIAL_MOVES[next_pos_p1] > next_pos_p1
+        if is_ladder_p1 and random.random() < 0.5:
+            p1_pos = SPECIAL_MOVES[next_pos_p1]
+        elif next_pos_p1 in SPECIAL_MOVES:
+            p1_pos = SPECIAL_MOVES[next_pos_p1]
         else:
-            if next_pos in SPECIAL_MOVES:
-                current_pos = SPECIAL_MOVES[next_pos]
-            else:
-                current_pos = next_pos
-    return turn_count
+            p1_pos = next_pos_p1
+        if p1_pos >= WIN_SQUARE: return turn_count
+
+        # Turno P2
+        turn_count += 1
+        dice_roll_p2 = random.randint(1, 6)
+        next_pos_p2 = p2_pos + dice_roll_p2
+        is_ladder_p2 = next_pos_p2 in SPECIAL_MOVES and SPECIAL_MOVES[next_pos_p2] > next_pos_p2
+        if is_ladder_p2 and random.random() < 0.5:
+            p2_pos = SPECIAL_MOVES[next_pos_p2]
+        elif next_pos_p2 in SPECIAL_MOVES:
+            p2_pos = SPECIAL_MOVES[next_pos_p2]
+        else:
+            p2_pos = next_pos_p2
+        if p2_pos >= WIN_SQUARE: return turn_count
 
 def analyze_game_duration_with_random_ladders():
     print("Pergunta 3: Se escadas tiverem 50% de chance de funcionar, qual a nova média de turnos?")
@@ -133,14 +147,13 @@ def find_fair_start_pos_for_p2():
     best_start_pos = 1
     prob_at_best_pos = 0.0
     min_prob_diff = 1.0
-    sims_per_square = 2500
 
     for test_square in range(1, 36):
         p1_wins = 0
-        for _ in range(sims_per_square):
+        for _ in range(SIMULATION_COUNT):
             if simulate_game_with_p2_advantage(test_square) == 1: p1_wins += 1
         
-        p1_win_prob = p1_wins / sims_per_square
+        p1_win_prob = p1_wins / SIMULATION_COUNT
         current_diff = abs(p1_win_prob - 0.50)
         
         if current_diff < min_prob_diff:
@@ -148,9 +161,8 @@ def find_fair_start_pos_for_p2():
             best_start_pos = test_square
             prob_at_best_pos = p1_win_prob
             
-    # Cálculo do intervalo de confiança para a melhor posição encontrada
     p = prob_at_best_pos
-    n = sims_per_square
+    n = SIMULATION_COUNT
     error_margin = 1.96 * math.sqrt((p * (1 - p)) / n)
     ci_lower = (p - error_margin) * 100
     ci_upper = (p + error_margin) * 100
@@ -158,7 +170,6 @@ def find_fair_start_pos_for_p2():
     print(f"> Para dar chances quase iguais, o Jogador 2 deveria começar na casa {best_start_pos}.")
     print(f"  (Isso resulta em uma chance de vitória para o Jogador 1 próxima de {prob_at_best_pos*100:.2f}%)")
     print(f"  (Com 95% de confiança, esta chance está entre {ci_lower:.2f}% e {ci_upper:.2f}%)")
-
 
 def simulate_game_with_p2_immunity():
     p1_pos = START_SQUARE
